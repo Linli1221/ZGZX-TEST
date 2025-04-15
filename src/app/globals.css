@@ -1,0 +1,682 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@import "@fontsource/dancing-script/index.css"; /* 导入 Dancing Script 字体 */
+@import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap'); /* 导入马善政字体 */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap'); /* 导入思源黑体(Noto Sans SC) */
+
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    color: var(--text-dark);
+  }
+
+  h1 {
+    font-weight: 700;
+  }
+}
+
+:root {
+  /* 吉卜力风格颜色系统 */
+  --primary-green: #5a9d6b;
+  --bg-color: #f7f2ea;  /* 原来是卡片的颜色 */
+  --card-color: #F2F8F3;  /* 原来是背景的颜色 */
+  --text-dark: #1a1207;  /* 更深的黑色，提高对比度 */
+  --text-medium: #3d2e1e; /* 修改为更深的颜色 */
+  --text-light: #6d5c4d;
+  --accent-brown: #d1b08e;
+  --accent-yellow: rgba(255, 220, 120, 0.6);
+
+  /* 保留原有颜色变量作为备用，但引用吉卜力风格颜色 */
+  --background: var(--bg-color);
+  --foreground: var(--text-dark);
+  --primary: var(--primary-green);
+  --primary-hover: #4a8d5b;
+  --secondary: #10b981;
+  --secondary-hover: #059669;
+  --accent: var(--accent-brown);
+  --accent-hover: #c09e7d;
+  --gray-50: var(--bg-color);
+  --gray-100: #edf4ef;
+  --gray-200: var(--card-color);
+  --gray-300: #e5dbd0;
+  --gray-400: var(--text-light);
+  --gray-500: var(--text-medium);
+  --gray-600: #5d4d3e;
+  --gray-700: #4d3e2f;
+  --gray-800: var(--text-dark);
+  --gray-900: #2d1e0e;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+body {
+  color: var(--text-medium);
+  background: var(--bg-color);
+  font-family: '思源黑体', 'Noto Sans SC', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  position: relative; /* 添加定位以便装饰元素定位 */
+  overflow-x: hidden; /* 防止水平滚动 */
+}
+
+/* 网格背景纹理 */
+.grid-background {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
+  background-size: 25px 25px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* 胶带效果 */
+.tape {
+  position: absolute;
+  height: 40px;
+  width: 120px;
+  background-color: var(--accent-yellow);
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-2deg);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  z-index: 2;
+}
+
+.tape-texture {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 2px,
+    rgba(255,255,255,0.2) 2px,
+    rgba(255,255,255,0.2) 4px
+  );
+}
+
+/* 翻页效果 */
+.page-curl {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 30px;
+  height: 30px;
+  background: linear-gradient(135deg, transparent 45%, rgba(0,0,0,0.05) 50%, rgba(0,0,0,0.1) 55%, var(--card-color) 60%);
+  border-radius: 0 0 0 10px;
+}
+
+/* 装饰小点 */
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--accent-brown);
+  opacity: 0.6;
+  position: absolute;
+}
+
+/* 波浪装饰 */
+.wave {
+  position: absolute;
+  opacity: 0.2;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--gray-100);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-brown);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-medium);
+}
+
+/* 自定义动画 */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; max-height: 0; transform: translateY(-10px); }
+  to { opacity: 1; max-height: 300px; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes typing {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 打字机效果动画 */
+@keyframes typewriter {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+@keyframes blinkCursor {
+  from, to { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+@keyframes charFadeIn {
+  0% { opacity: 0; transform: translateY(3px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn { animation: fadeIn 0.4s ease-out; }
+.animate-slideIn { animation: slideInLeft 0.3s ease-out; }
+.animate-slideDown { animation: slideDown 0.3s ease-out; }
+.animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+.animate-typing {
+  animation: typing 0.15s ease-out;
+  animation-fill-mode: both;
+}
+
+/* 逐字打字机效果样式 */
+.typewriter-char {
+  display: inline-block;
+  opacity: 0;
+  animation: charFadeIn 0.05s ease-out forwards;
+}
+
+.typewriter-cursor {
+  display: inline-block;
+  width: 3px;
+  height: 1.2em;
+  background-color: var(--primary-green);
+  margin-left: 2px;
+  animation: blinkCursor 0.7s infinite;
+  vertical-align: middle;
+  border-radius: 1px;
+  opacity: 0.8;
+}
+
+/* 吉卜力风格按钮 */
+.ghibli-button {
+  background-color: var(--primary-green);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 30px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+}
+
+.ghibli-button:hover {
+  background-color: var(--primary-hover);
+  transform: translateY(-2px);
+}
+
+.ghibli-button.outline {
+  background-color: transparent;
+  border: 2px solid var(--primary-green);
+  color: var(--primary-green);
+}
+
+.ghibli-button.outline:hover {
+  background-color: rgba(90,157,107,0.1);
+}
+
+.round-button {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: var(--primary-green);
+  border: none;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.round-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40%;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.4), rgba(255,255,255,0));
+  border-radius: 50% 50% 0 0;
+}
+
+.round-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+.round-button:active {
+  transform: scale(0.97);
+}
+
+/* 吉卜力风格卡片 */
+.ghibli-card {
+  background-color: var(--card-color);
+  background-image:
+    linear-gradient(rgba(120, 180, 140, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 180, 140, 0.07) 1px, transparent 1px);
+  background-size: 20px 20px;
+  border-radius: 22px;
+  padding: 30px;
+  position: relative;
+  border: 1.5px solid rgba(120, 180, 140, 0.4);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.06), 0 3px 10px rgba(0,0,0,0.04);
+  overflow: hidden;
+  font-weight: 500;
+}
+
+/* 删除原来的叠层纹路效果 */
+/* .ghibli-card::before, .ghibli-card::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-color: var(--card-color);
+  border-radius: 22px;
+  border: 1.5px solid rgba(120, 180, 140, 0.3);
+  z-index: -1;
+  transform: rotate(-1deg) translateX(-2px) translateY(2px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.03);
+}
+
+.ghibli-card::after {
+  transform: rotate(1deg) translateX(3px) translateY(1px);
+} */
+
+/* 编辑器网格背景 */
+.editor-grid-bg {
+  background-color: var(--card-color);
+  background-image:
+    linear-gradient(rgba(120, 180, 140, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 180, 140, 0.07) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.ghibli-card h3, .ghibli-card h4 {
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.ghibli-card p {
+  font-weight: 500;
+}
+
+/* 自定义组件样式 */
+.menu-item {
+  @apply py-3 px-5 flex items-center cursor-pointer transition-all duration-200 rounded-xl my-1 mx-2;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  color: var(--text-medium);
+}
+
+.menu-icon {
+  @apply w-8 h-8 flex items-center justify-center mr-3 transition-colors duration-200;
+  color: var(--text-light);
+}
+
+.menu-text {
+  @apply text-base font-medium transition-colors duration-200;
+  color: var(--text-medium);
+}
+
+/* 菜单项悬停和激活效果 */
+.menu-item:hover, .menu-item.active {
+  background-color: rgba(90,157,107,0.1);
+}
+
+.menu-item:hover .menu-icon, .menu-item.active .menu-icon {
+  color: var(--primary-green);
+}
+
+.menu-item:hover .menu-text, .menu-item.active .menu-text {
+  color: var(--primary-green);
+}
+
+.menu-item.active .menu-text {
+  @apply font-semibold;
+}
+
+/* 下拉菜单样式 */
+.submenu {
+  @apply ml-8 overflow-hidden;
+  animation: slideDown 0.3s ease-out;
+}
+
+.submenu .menu-item {
+  @apply py-2 px-4;
+}
+
+/* 所有卡片和组件统一使用card-color作为背景色 */
+.card,
+div.sidebar,
+.footer,
+.h-16.border-b,
+.h-16.border-t,
+.modal-header,
+.bg-white,
+.animate-slideDown,
+.w-64.border-r {
+  background-color: var(--card-color) !important;
+  border-color: rgba(120, 180, 140, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04), 0 0 0 1.5px rgba(120, 180, 140, 0.3);
+  transition: box-shadow 0.3s ease;
+}
+
+.card:hover,
+div.sidebar:hover,
+.h-16.border-b:hover,
+.w-64.border-r:hover,
+.menu-item:hover {
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06), 0 0 0 1.5px rgba(120, 180, 140, 0.35);
+}
+
+.card {
+  @apply rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1 overflow-hidden;
+  background-color: var(--card-color);
+  border: 1.5px solid rgba(120, 180, 140, 0.4);
+  font-weight: 500;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04), 0 2px 5px rgba(0, 0, 0, 0.03), 0 0 0 1px rgba(120, 180, 140, 0.2) !important;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 1;
+}
+
+.card h3, .card h4 {
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.card p {
+  font-weight: 500;
+}
+
+.btn-primary {
+  @apply px-5 py-2.5 rounded-xl flex items-center justify-center text-sm font-medium transition-all duration-200 shadow-sm hover:shadow focus:ring-2 focus:ring-opacity-50;
+  background-color: var(--primary-green);
+  color: white;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15), 0 3px 6px rgba(0, 0, 0, 0.1);
+}
+
+.btn-secondary {
+  @apply px-5 py-2.5 rounded-xl flex items-center justify-center text-sm font-medium transition-all duration-200 shadow-sm hover:shadow focus:ring-2 focus:ring-opacity-50;
+  background-color: rgba(255,255,255,0.7);
+  color: var(--text-medium);
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.btn-secondary:hover {
+  background-color: rgba(255,255,255,0.9);
+  color: var(--text-dark);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06);
+}
+
+.btn-outline {
+  @apply border hover:border-gray-400 bg-transparent px-5 py-2.5 rounded-xl flex items-center justify-center text-sm font-medium transition-all duration-200 shadow-sm hover:shadow focus:ring-2 focus:ring-opacity-50;
+  border-color: var(--accent-brown);
+  color: var(--text-medium);
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.btn-outline:hover {
+  background-color: rgba(209,176,142,0.1);
+  color: var(--text-dark);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.section-title {
+  @apply text-2xl font-bold mb-6 tracking-wide;
+  font-family: 'Ma Shan Zheng', cursive;
+  color: var(--text-dark);
+}
+
+.badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.badge-blue { @apply bg-blue-100 text-blue-800; }
+.badge-green {
+  background-color: rgba(90,157,107,0.2);
+  color: var(--primary-green);
+}
+.badge-purple { @apply bg-purple-100 text-purple-800; }
+.badge-yellow {
+  background-color: var(--accent-yellow);
+  color: var(--text-dark);
+}
+
+.input {
+  @apply w-full px-4 py-2.5 text-gray-700 bg-white border rounded-xl focus:outline-none focus:ring-2 focus:border-transparent transition-all duration-200;
+  border-color: var(--accent-brown);
+}
+
+.input:focus {
+  box-shadow: 0 0 0 2px rgba(90,157,107,0.3);
+}
+
+.glass-effect {
+  @apply bg-opacity-70 backdrop-blur-md border border-white border-opacity-20 shadow-sm rounded-2xl;
+  background-color: rgba(247, 242, 234, 0.7);
+}
+
+/* 回退按钮样式 */
+.back-button {
+  @apply mr-3 p-2 rounded-full shadow-sm transition-all duration-200 flex items-center justify-center hover:scale-110 focus:outline-none focus:ring-2 focus:ring-opacity-50;
+  background-color: white;
+  color: var(--text-medium);
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.back-button .material-icons {
+  @apply text-xl transition-colors duration-200;
+}
+
+.back-button:hover .material-icons {
+  color: var(--primary-green);
+}
+
+@media (max-width: 640px) {
+  .back-button {
+    @apply p-1.5;
+  }
+
+  .back-button .material-icons {
+    @apply text-lg;
+  }
+
+  .ghibli-card {
+    @apply p-4;
+  }
+
+  .section-title {
+    @apply text-lg;
+  }
+
+  .dot, .wave {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
+}
+
+/* 添加视口高度适配 */
+@media (max-height: 768px) {
+  .py-6 {
+    @apply py-3;
+  }
+
+  .py-8 {
+    @apply py-4;
+  }
+
+  .space-y-4 > * + * {
+    margin-top: 0.75rem;
+  }
+
+  .mt-12 {
+    @apply mt-6;
+  }
+
+  .mt-8 {
+    @apply mt-4;
+  }
+
+  .h-80 {
+    height: 18rem;
+  }
+}
+
+.sidebar {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08), 0 4px 10px rgba(0, 0, 0, 0.06), 0 0 0 1.5px rgba(120, 180, 140, 0.4) !important;
+  transition: all 0.3s ease;
+}
+
+.sidebar:hover {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1), 0 5px 15px rgba(0, 0, 0, 0.07), 0 0 0 1.5px rgba(120, 180, 140, 0.5) !important;
+}
+
+/* 增强所有组件的阴影效果 */
+.sidebar,
+.animate-slideDown,
+.modal-content,
+.modal-header {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08), 0 4px 10px rgba(0, 0, 0, 0.06), 0 0 0 1.5px rgba(120, 180, 140, 0.4) !important;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 1;
+}
+
+.sidebar:hover,
+.animate-slideDown:hover {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1), 0 5px 15px rgba(0, 0, 0, 0.07), 0 0 0 1.5px rgba(120, 180, 140, 0.5) !important;
+}
+
+.card:hover {
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.05), 0 3px 8px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(120, 180, 140, 0.25) !important;
+}
+
+/* 创意地图专用样式 */
+.creative-map-card {
+  background-color: var(--card-color);
+  border-radius: 15px;
+  padding: 20px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  position: relative;
+  overflow: visible;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border: 1px solid rgba(120, 180, 140, 0.3);
+  margin-top: 20px;
+}
+
+.creative-map-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+}
+
+/* 创意地图胶带效果 */
+.creative-map-tape {
+  position: absolute;
+  height: 30px;
+  width: 100px;
+  background-color: var(--accent-yellow);
+  top: -15px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-2deg);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  z-index: 2;
+}
+
+.creative-map-tape::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 2px,
+    rgba(255,255,255,0.2) 2px,
+    rgba(255,255,255,0.2) 4px
+  );
+}
+
+/* 创意地图页面卷曲效果 */
+.creative-map-curl {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 25px;
+  height: 25px;
+  background: linear-gradient(135deg, transparent 45%, rgba(0,0,0,0.05) 50%, rgba(0,0,0,0.1) 55%, var(--card-color) 60%);
+  border-radius: 0 0 0 8px;
+}

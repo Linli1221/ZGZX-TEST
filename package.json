@@ -1,0 +1,45 @@
+{
+  "name": "untitled2",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@fontsource/comfortaa": "^5.2.5",
+    "@fontsource/dancing-script": "^5.2.5",
+    "@fontsource/pacifico": "^5.2.5",
+    "@tailwindcss/typography": "^0.5.16",
+    "@tiptap/extension-character-count": "^2.11.7",
+    "@tiptap/extension-image": "^2.11.7",
+    "@tiptap/pm": "^2.11.7",
+    "@tiptap/react": "^2.11.7",
+    "@tiptap/starter-kit": "^2.11.7",
+    "encoding-japanese": "^2.2.0",
+    "framer-motion": "^12.6.5",
+    "idb": "^8.0.2",
+    "jschardet": "^3.1.4",
+    "next": "14.2.5",
+    "openai": "^4.85.4",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-markdown": "^10.1.0",
+    "text-encoding": "^0.7.0",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.5",
+    "postcss": "^8.5.3",
+    "postcss-import": "^16.1.0",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5"
+  }
+}
