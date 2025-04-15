@@ -28,11 +28,15 @@ interface PromptDetailContentProps {
   isEditing?: boolean;
   editedPrompt?: Prompt;
   handleInputChange?: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+  handleExampleChange?: (index: number, value: string) => void;
+  addExample?: () => void;
+  removeExample?: (index: number) => void;
   showEditButtons?: boolean;
   onEdit?: () => void;
   onSave?: () => void;
   onCancel?: () => void;
   onDelete?: () => void;
+  onCopy?: () => void;
 }
 
 /**
@@ -43,11 +47,15 @@ export function PromptDetailContent({
   isEditing = false,
   editedPrompt,
   handleInputChange,
+  handleExampleChange,
+  addExample,
+  removeExample,
   showEditButtons = true,
   onEdit,
   onSave,
   onCancel,
-  onDelete
+  onDelete,
+  onCopy
 }: PromptDetailContentProps) {
   
   // 提示词类型的信息
@@ -117,6 +125,16 @@ export function PromptDetailContent({
         {/* 操作按钮区 */}
         {showEditButtons && (
           <div className="flex justify-end mt-6 space-x-3">            
+            {onCopy && (
+              <button 
+                onClick={onCopy}
+                className="btn-outline flex items-center text-sm px-4 py-2 text-[#6F9CE0] border-[#6F9CE0]"
+              >
+                <span className="material-icons mr-1 text-sm">content_copy</span>
+                复制
+              </button>
+            )}
+            
             {onEdit && (
               <button 
                 onClick={onEdit}
@@ -182,13 +200,76 @@ export function PromptDetailContent({
               <label className="block text-text-dark font-medium mb-2">描述 <span className="text-text-light text-sm">(可选)</span></label>
               <textarea
                 name="description"
-                className="w-full px-4 py-3 bg-white bg-opacity-70 border border-[rgba(120,180,140,0.3)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[rgba(120,180,140,0.5)] text-text-dark flex-grow min-h-[240px]"
+                className="w-full px-4 py-3 bg-white bg-opacity-70 border border-[rgba(120,180,140,0.3)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[rgba(120,180,140,0.5)] text-text-dark flex-grow min-h-[160px]"
                 placeholder="简短描述提示词的用途..."
                 value={editedPrompt?.description || ''}
                 onChange={handleInputChange}
               ></textarea>
             </div>
+            
+            {/* 示例管理 */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-text-dark font-medium">示例 <span className="text-text-light text-sm">(可选)</span></label>
+                {addExample && (
+                  <button
+                    type="button"
+                    onClick={addExample}
+                    className="flex items-center text-sm text-[#5a9d6b] hover:underline"
+                  >
+                    <span className="material-icons mr-1 text-sm">add</span>
+                    添加示例
+                  </button>
+                )}
+              </div>
+              
+              <div className="space-y-3">
+                {editedPrompt?.examples && editedPrompt.examples.map((example, index) => (
+                  <div key={index} className="flex items-start">
+                    <textarea
+                      className="flex-grow px-4 py-2 bg-white bg-opacity-70 border border-[rgba(120,180,140,0.3)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[rgba(120,180,140,0.5)] text-text-dark"
+                      placeholder={`示例 ${index + 1}...`}
+                      value={example}
+                      onChange={(e) => handleExampleChange && handleExampleChange(index, e.target.value)}
+                      rows={2}
+                    ></textarea>
+                    {removeExample && (
+                      <button
+                        type="button"
+                        onClick={() => removeExample(index)}
+                        className="ml-2 text-[#E06F6F] hover:text-[#d85050]"
+                      >
+                        <span className="material-icons">delete</span>
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           </form>
+        </div>
+        
+        {/* 底部按钮 */}
+        <div className="flex justify-end mt-6 space-x-3">
+          {onCancel && (
+            <button 
+              onClick={onCancel}
+              className="btn-outline flex items-center text-sm px-4 py-2"
+            >
+              <span className="material-icons mr-1 text-sm">cancel</span>
+              取消
+            </button>
+          )}
+          
+          {onSave && (
+            <button 
+              onClick={onSave}
+              className="btn-fill flex items-center text-sm px-4 py-2"
+            >
+              <span className="material-icons mr-1 text-sm">save</span>
+              保存
+            </button>
+          )}
         </div>
         
         {/* 翻页效果 */}
