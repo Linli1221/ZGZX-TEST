@@ -1,361 +1,179 @@
-import { OpenAI } from 'openai';
-import { getApiKey, saveApiKey as saveApiKeyToSettings } from './settingsManager';
+import { getApiKey } from './settingsManager';
 
-// 模型常量
-export const MODELS = {
-  GEMINI_FLASH: 'gemini-2.0-flash-thinking-exp-01-21',
-  GEMINI_PRO: 'gemini-2.5-pro-exp-03-25',
-};
-
-// API配置
-const API_BASE = 'https://bin.24642698.xyz/v1';
-
-// 导出saveApiKey函数，使用settingsManager中的函数
-export const saveApiKey = async (apiKey: string): Promise<void> => {
-  return saveApiKeyToSettings(apiKey);
-};
-
-// 用户设置的systemPrompt
-let userSystemPrompt = " ";
-
-// 生成选项接口
-export interface GenerateOptions {
+/**
+ * AI生成选项接口
+ */
+interface GenerateOptions {
   model: string;
-  systemPrompt: string;
-  temperature: number;
-  maxTokens: number;
-  stream: boolean;
-  abortSignal?: AbortSignal;
-  disableSystemPrompt?: boolean; // 新增：完全禁用系统提示词
+  temperature?: number;
+  maxTokens?: number;
+  stream?: boolean;
+  onStream?: (content: string) => void;
 }
 
-// 章节接口
-export interface Chapter {
-  title: string;
-  content: string;
-}
-
-// 默认选项 - 移除 systemPrompt，它将在调用时处理
-const DEFAULT_OPTIONS: Omit<GenerateOptions, 'systemPrompt'> = {
-  model: MODELS.GEMINI_PRO,
+/**
+ * 默认生成选项
+ */
+const DEFAULT_OPTIONS: GenerateOptions = {
+  model: 'gemini-2.5-pro-exp-03-25', // 默认模型
   temperature: 0.7,
   maxTokens: 64000,
-  stream: false
-};
-
-// 模型特定配置 - 移除温度设置，让默认值生效
-const MODEL_SPECIFIC_OPTIONS = {
-  [MODELS.GEMINI_FLASH]: {
-    maxTokens: 64000,
-  },
-  [MODELS.GEMINI_PRO]: {
-    maxTokens: 64000,
-  }
-};
-
-// 错误处理函数
-const handleAIError = (error: any): string => {
-  console.error('AI服务错误:', error);
-
-  // 检查特定错误类型
-  const errorMessage = error?.message || '';
-  if (errorMessage.includes('API key not configured')) {
-      return '发送失败';
-  }
-  if (
-    errorMessage.includes('token') ||
-    errorMessage.includes('tokens') ||
-    errorMessage.includes('长度') ||
-    errorMessage.includes('length') ||
-    errorMessage.includes('too long') ||
-    errorMessage.includes('maximum')
-  ) {
-    return '内容长度超出模型限制，请尝试减少输入内容或切换到支持更长文本的模型';
-  }
-  if (
-    errorMessage.includes('network') ||
-    errorMessage.includes('timeout') ||
-    errorMessage.includes('连接') ||
-    errorMessage.includes('connection')
-  ) {
-    return '网络连接错误，请检查您的网络连接并重试';
-  }
-  if (
-    errorMessage.includes('api key') ||
-    errorMessage.includes('apikey') ||
-    errorMessage.includes('authentication') ||
-    errorMessage.includes('认证') ||
-    error?.status === 401 // 常见的认证错误状态码
-  ) {
-    return 'API认证失败，请检查您的API密钥是否正确或有效';
-  }
-
-  // 默认错误消息
-  return '生成内容失败，请稍后重试';
+  stream: false,
 };
 
 /**
- * System Prompt管理
+ * 解析SSE流数据
+ * @param chunk 数据块
+ * @returns 解析后的JSON对象
  */
-export const SystemPrompt = {
-  set: (prompt: string): void => {
-    userSystemPrompt = prompt || " ";
-  },
-  get: (): string => userSystemPrompt
-};
-
-/**
- * 格式化章节内容
- */
-export const ChapterFormatter = {
-  /**
-   * 格式化选中的章节内容
-   */
-  format: (
-    chapters: Chapter[] | { title: string; content: string }[],
-    selectedIndices: number[]
-  ): string => {
-    if (!chapters || !Array.isArray(chapters) || !selectedIndices || !Array.isArray(selectedIndices)) {
-      return "===== 章节内容 =====\n\n无有效内容";
-    }
-
-    try {
-      // 提取选中的章节
-      const selectedChaptersContent = selectedIndices
-        .filter(index => index >= 0 && index < chapters.length)
-        .map(index => {
-          const chapter = chapters[index];
-          const title = chapter?.title || `章节 ${index + 1}`;
-          const content = chapter?.content || "";
-          return `# ${title}\n\n${content}`;
-        })
-        .join('\n\n---\n\n');
-
-      return `===== 章节内容 =====\n\n${selectedChaptersContent || "无内容"}`;
-    } catch (error) {
-      console.error("格式化章节内容失败:", error);
-      return "===== 章节内容 =====\n\n格式化失败";
-    }
-  },
-
-  /**
-   * 兼容旧版API的格式化函数
-   */
-  formatPrompt: (
-    chapters: Chapter[] | { title: string; content: string }[],
-    selectedIndices: number[],
-    prompt: string
-  ): string => {
-    const formattedChapters = ChapterFormatter.format(chapters, selectedIndices);
-    // 确保 prompt 和 formattedChapters 之间有明确的分隔，并且 prompt 在前
-    return `${prompt}\n\n${formattedChapters}`;
+const parseSSEResponse = (chunk: string): any => {
+  // 移除"data: "前缀
+  const jsonStr = chunk.replace(/^data: /, '').trim();
+  
+  // 处理结束标记
+  if (jsonStr === '[DONE]') {
+    return { done: true };
+  }
+  
+  try {
+    return JSON.parse(jsonStr);
+  } catch (error) {
+    console.error("无法解析SSE响应:", error);
+    console.debug("原始响应:", jsonStr);
+    return null;
   }
 };
 
 /**
- * AI内容生成核心
+ * AI生成服务
  */
 export const AIGenerator = {
   /**
-   * 生成AI内容(非流式)
+   * 生成文本内容
+   * @param prompt 提示词
+   * @param options 生成选项
+   * @returns 生成的内容
    */
-  generate: async (
-    content: string,
-    options: Partial<GenerateOptions> = {}
-  ): Promise<string> => {
-    if (!content) return "";
-
-    // 确保仅在客户端执行
-    if (typeof window === 'undefined') {
-      throw new Error('AI generation can only be executed in browser environment');
-    }
-
-    // 1. 获取 API Key
-    const apiKey = await getApiKey();
-    if (!apiKey) {
-      throw new Error('API key not configured'); // 抛出特定错误
-    }
-
-    // 2. 合并选项
-    const mergedOptions = {
-      ...DEFAULT_OPTIONS,
-      ...options, // 用户传入的选项覆盖默认值
-      stream: false // 强制非流式
-    };
-    // 应用模型特定配置 (如果用户没有覆盖)
-    if (MODEL_SPECIFIC_OPTIONS[mergedOptions.model]) {
-        mergedOptions.maxTokens = options.maxTokens ?? MODEL_SPECIFIC_OPTIONS[mergedOptions.model].maxTokens;
-    }
-    // 获取当前 systemPrompt
-    const currentSystemPrompt = options.systemPrompt ?? SystemPrompt.get();
-
+  generate: async (prompt: string, options?: Partial<GenerateOptions>): Promise<string> => {
     try {
-      console.log(`使用模型: ${mergedOptions.model}, maxTokens: ${mergedOptions.maxTokens}`);
-
-      // 3. 创建临时客户端
-      const localClient = new OpenAI({
-        apiKey: apiKey, // 使用本次获取的 key
-        baseURL: API_BASE,
-        dangerouslyAllowBrowser: true, // 确保在浏览器环境中允许API调用
-        defaultHeaders: {
-            "HTTP-Referer": "逐光写作",
-            "X-Title": "逐光写作-客户端",
-        }
-      });
-
-      // 4. 构建消息数组
-      const messages = [];
-      if (currentSystemPrompt && currentSystemPrompt.trim()) {
-        messages.push({ role: 'system', content: currentSystemPrompt });
+      // 获取API密钥
+      const apiKey = await getApiKey();
+      if (!apiKey) {
+        throw new Error('未找到API密钥，请先在设置中配置API密钥');
       }
-      messages.push({ role: 'user', content: content });
 
-      // 5. 发起请求
-      const response = await localClient.chat.completions.create({
-        model: mergedOptions.model,
-        messages: messages as any, // 类型断言可能需要调整
-        temperature: mergedOptions.temperature,
-        max_tokens: mergedOptions.maxTokens,
-      });
+      // 合并选项
+      const finalOptions: GenerateOptions = {
+        ...DEFAULT_OPTIONS,
+        ...options,
+      };
 
-      return response.choices[0]?.message?.content || '';
+      // 构建请求数据
+      const data = {
+        model: finalOptions.model,
+        messages: [
+          { role: "system", content: prompt },
+          { role: "user", content: "none" }
+        ],
+        stream: finalOptions.stream,
+        temperature: finalOptions.temperature,
+        max_tokens: finalOptions.maxTokens,
+      };
+
+      // 如果是流式请求
+      if (finalOptions.stream && finalOptions.onStream) {
+        let fullContent = "";
+        
+        // 发送流式请求
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(data),
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`API请求失败: ${response.status} ${errorText}`);
+        }
+        
+        if (!response.body) {
+          throw new Error('响应体为空');
+        }
+        
+        // 创建读取器和解码器处理流
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          
+          // 解码并拆分数据块
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+          
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            
+            // 解析SSE响应
+            const parsed = parseSSEResponse(line);
+            
+            if (!parsed || parsed.done) continue;
+            
+            // 提取内容并更新
+            if (parsed.choices && parsed.choices.length > 0) {
+              const content = parsed.choices[0].delta?.content || '';
+              if (content) {
+                fullContent += content;
+                finalOptions.onStream(fullContent);
+              }
+            }
+          }
+        }
+        
+        return fullContent;
+      } else {
+        // 发送普通请求
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(data),
+        });
+
+        // 处理响应
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`API请求失败: ${response.status} ${errorText}`);
+        }
+
+        const result = await response.json();
+        
+        // 提取生成内容
+        if (result.choices && result.choices.length > 0 && result.choices[0].message) {
+          return result.choices[0].message.content.trim();
+        } else {
+          throw new Error('无法获取生成内容');
+        }
+      }
     } catch (error) {
-      const errorMessage = handleAIError(error);
-      throw new Error(errorMessage);
+      console.error('AI生成错误:', error);
+      throw error;
     }
   },
 
   /**
-   * 生成AI内容(流式)
+   * 获取可用的模型列表
    */
-  generateStream: async (
-    content: string,
-    options: Partial<GenerateOptions> = {},
-    onChunk: (chunk: string) => void
-  ): Promise<void> => {
-    if (!content || typeof onChunk !== 'function') return;
-
-    // 1. 获取 API Key
-    const apiKey = await getApiKey();
-    if (!apiKey) {
-      throw new Error('API key not configured'); // 抛出特定错误
-    }
-
-    // 创建一个局部的中止信号检查变量
-    let isLocalAborted = false;
-    if (options.abortSignal) {
-      // 监听中止信号
-      options.abortSignal.addEventListener('abort', () => {
-        isLocalAborted = true;
-      });
-    }
-
-    // 2. 合并选项
-    const mergedOptions = {
-      ...DEFAULT_OPTIONS,
-      ...options, // 用户传入的选项覆盖默认值
-      stream: true // 强制流式
-    };
-     // 应用模型特定配置 (如果用户没有覆盖)
-    if (MODEL_SPECIFIC_OPTIONS[mergedOptions.model]) {
-        mergedOptions.maxTokens = options.maxTokens ?? MODEL_SPECIFIC_OPTIONS[mergedOptions.model].maxTokens;
-    }
-    // 获取当前 systemPrompt
-    const currentSystemPrompt = options.systemPrompt ?? SystemPrompt.get();
-
-
-    try {
-      console.log(`流式生成使用模型: ${mergedOptions.model}, maxTokens: ${mergedOptions.maxTokens}`);
-
-      // 3. 创建临时客户端
-      const localClient = new OpenAI({
-        apiKey: apiKey, // 使用本次获取的 key
-        baseURL: API_BASE,
-        dangerouslyAllowBrowser: true,
-        defaultHeaders: {
-            "HTTP-Referer": "YOUR_SITE_URL",
-            "X-Title": "YOUR_SITE_NAME",
-        }
-      });
-
-      // 4. 构建消息数组
-      const messages = [];
-      // 仅当没有禁用系统提示词选项且系统提示词不为空时，才添加系统提示词
-      if (!mergedOptions.disableSystemPrompt && currentSystemPrompt && currentSystemPrompt.trim()) {
-        messages.push({ role: 'system', content: currentSystemPrompt });
-      }
-      messages.push({ role: 'user', content: content });
-
-      // 5. 发起流式请求
-      const stream = await localClient.chat.completions.create({
-        model: mergedOptions.model,
-        messages: messages as any, // 类型断言可能需要调整
-        temperature: mergedOptions.temperature,
-        max_tokens: mergedOptions.maxTokens,
-        stream: true,
-        ...(mergedOptions.abortSignal ? { signal: mergedOptions.abortSignal } : {}), // 添加中止信号
-      });
-
-      for await (const chunk of stream) {
-        // 如果中止信号已经触发，立即停止处理并抛出中止错误
-        if (isLocalAborted) {
-          throw new Error('AbortError');
-        }
-
-        const contentChunk = chunk.choices[0]?.delta?.content || '';
-        if (contentChunk) {
-          onChunk(contentChunk);
-        }
-      }
-    } catch (error) {
-      // 如果是中止错误，转换为标准的AbortError以便统一处理
-      if (isLocalAborted || (error instanceof Error && error.message === 'AbortError')) {
-        const abortError = new Error('AbortError');
-        abortError.name = 'AbortError';
-        throw abortError;
-      }
-
-      const errorMessage = handleAIError(error);
-      throw new Error(errorMessage);
-    }
-  }
-};
-
-/**
- * 章节分析功能
- */
-export const ChapterAnalyzer = {
-  /**
-   * 分析章节(非流式)
-   */
-  analyze: async (
-    chapters: Chapter[] | { title: string; content: string }[],
-    selectedIndices: number[],
-    options: Partial<GenerateOptions> = {}
-  ): Promise<string> => {
-    const formattedContent = ChapterFormatter.format(chapters, selectedIndices);
-    return await AIGenerator.generate(formattedContent, options);
+  getAvailableModels: () => {
+    return [
+      { id: 'gemini-2.5-flash-preview-04-17', name: 'Gemini 2.5 Flash' },
+      { id: 'gemini-2.5-pro-exp-03-25', name: 'Gemini 2.5 Pro' },
+    ];
   },
-
-  /**
-   * 分析章节(流式)
-   */
-  analyzeStream: async (
-    chapters: Chapter[] | { title: string; content: string }[],
-    selectedIndices: number[],
-    options: Partial<GenerateOptions> = {},
-    onChunk: (chunk: string) => void
-  ): Promise<void> => {
-    const formattedContent = ChapterFormatter.format(chapters, selectedIndices);
-    await AIGenerator.generateStream(formattedContent, options, onChunk);
-  }
 };
-
-// 兼容旧版API的导出
-export const setSystemPrompt = SystemPrompt.set;
-export const getSystemPrompt = SystemPrompt.get;
-export const formatChaptersPrompt = ChapterFormatter.formatPrompt;
-export const generateAIContent = AIGenerator.generate;
-export const generateAIContentStream = AIGenerator.generateStream;
-export const analyzeChapters = ChapterAnalyzer.analyze;
-export const analyzeChaptersStream = ChapterAnalyzer.analyzeStream;
