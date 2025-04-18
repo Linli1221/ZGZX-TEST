@@ -2,11 +2,12 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getWorkById, updateWork, Work } from '@/lib/db';
+import { getWorkById, updateWork, Work, Prompt, getPromptsByType } from '@/lib/db';
 import Sidebar from '@/components/Sidebar';
 import BackButton from '@/components/BackButton';
 import TopBar from '@/components/TopBar';
 import { workContentUtils } from '@/lib/utils';
+import { AIGenerator } from '@/lib/AIservice';
 
 // 防抖函数
 const debounce = <T extends (...args: any[]) => any>(func: T, delay: number): DebouncedFunction<T> => {
@@ -131,9 +132,155 @@ const RichTextEditor = ({
   // 添加一个状态来控制是否使用A4宽度，默认为true
   const [isA4Width, setIsA4Width] = React.useState(true);
   
+  // 添加一个状态来控制AI写作弹窗的显示与隐藏
+  const [showAIWritingModal, setShowAIWritingModal] = React.useState(false);
+  
+  // 添加AI提示词状态
+  const [aiPrompt, setAIPrompt] = React.useState('');
+  
+  // 添加模型选择状态，使用AIGenerator获取默认模型
+  const [selectedModel, setSelectedModel] = React.useState(AIGenerator.getAvailableModels()[0].id);
+  
+  // 获取可用的模型列表
+  const availableModels = React.useMemo(() => AIGenerator.getAvailableModels(), []);
+  
+  // 添加提示词库状态
+  const [prompts, setPrompts] = React.useState<Prompt[]>([]);
+  const [selectedPrompt, setSelectedPrompt] = React.useState<number | null>(null);
+  
+  // 添加生成结果状态
+  const [generatedContent, setGeneratedContent] = React.useState('');
+  const [showResultModal, setShowResultModal] = React.useState(false);
+  const [isGenerating, setIsGenerating] = React.useState(false);
+  const [generateError, setGenerateError] = React.useState('');
+  const [isStreaming, setIsStreaming] = React.useState(false);
+  
+  // 添加结果容器引用
+  const resultContainerRef = React.useRef<HTMLDivElement>(null);
+  
+  // 添加自动滚动效果
+  React.useEffect(() => {
+    if (isStreaming && resultContainerRef.current) {
+      resultContainerRef.current.scrollTop = resultContainerRef.current.scrollHeight;
+    }
+  }, [generatedContent, isStreaming]);
+  
+  // 在组件挂载时加载提示词
+  React.useEffect(() => {
+    const loadPrompts = async () => {
+      try {
+        // 只加载写作类型的提示词
+        const writingPrompts = await getPromptsByType('writing');
+        setPrompts(writingPrompts);
+      } catch (error) {
+        console.error('加载提示词失败:', error);
+      }
+    };
+    
+    loadPrompts();
+  }, []);
+  
   // 切换A4宽度模式
   const toggleA4Width = () => {
     setIsA4Width(!isA4Width);
+  };
+  
+  // 打开AI写作弹窗
+  const openAIWritingModal = () => {
+    setShowAIWritingModal(true);
+  };
+  
+  // 关闭AI写作弹窗
+  const closeAIWritingModal = () => {
+    setShowAIWritingModal(false);
+    // 重置状态
+    setAIPrompt('');
+    setSelectedPrompt(null);
+    setGenerateError('');
+  };
+  
+  // 处理AI提示词输入变化
+  const handleAIPromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setAIPrompt(e.target.value);
+  };
+  
+  // 处理模型选择变化
+  const handleModelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedModel(e.target.value);
+  };
+  
+  // 处理提示词选择变化
+  const handlePromptChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const promptId = parseInt(e.target.value);
+    if (promptId === -1) {
+      setSelectedPrompt(null);
+      setAIPrompt('');
+    } else {
+      setSelectedPrompt(promptId);
+      // 找到选中的提示词并设置内容
+      const selected = prompts.find(p => p.id === promptId);
+      if (selected) {
+        setAIPrompt(selected.content);
+      }
+    }
+  };
+  
+  // 显示结果弹窗
+  const showResultModalHandler = () => {
+    setShowResultModal(true);
+  };
+  
+  // 关闭结果弹窗
+  const closeResultModal = () => {
+    setShowResultModal(false);
+  };
+  
+  // 应用生成的内容到编辑器
+  const applyGeneratedContent = () => {
+    onChange(content + '\n\n' + generatedContent);
+    closeResultModal();
+  };
+  
+  // 处理AI生成内容
+  const handleAIGenerate = async () => {
+    if (!aiPrompt.trim()) {
+      setGenerateError('请输入写作提示');
+      return;
+    }
+    
+    setIsGenerating(true);
+    setGenerateError('');
+    setGeneratedContent('');
+    
+    try {
+      // 构建提示内容
+      const promptContent = aiPrompt;
+      
+      // 关闭写作弹窗，显示结果弹窗
+      setShowAIWritingModal(false);
+      showResultModalHandler();
+      setIsStreaming(true);
+      
+      // 调用AIservice接口，使用流式模式
+      const result = await AIGenerator.generate(promptContent, {
+        model: selectedModel,
+        temperature: 0.7,
+        maxTokens: 64000,
+        stream: true,
+        onStream: (content) => {
+          setGeneratedContent(content);
+        }
+      });
+      
+      // 设置最终生成结果
+      setGeneratedContent(result);
+    } catch (error) {
+      console.error('AI生成失败:', error);
+      setGenerateError(error instanceof Error ? error.message : '生成内容失败，请稍后重试');
+    } finally {
+      setIsGenerating(false);
+      setIsStreaming(false);
+    }
   };
 
   return (
@@ -147,13 +294,22 @@ const RichTextEditor = ({
           placeholder="章节标题"
           style={{ fontFamily: "'Ma Shan Zheng', cursive" }}
         />
-        <button
-          onClick={toggleA4Width}
-          className="ml-4 p-2 rounded-lg hover:bg-[rgba(120,180,140,0.1)] transition-colors duration-200 flex items-center text-primary-green"
-          title={isA4Width ? "切换到全宽模式" : "切换到A4宽度模式"}
-        >
-          <span className="material-icons">{isA4Width ? "fullscreen" : "fit_screen"}</span>
-        </button>
+        <div className="flex items-center">
+          <button
+            onClick={openAIWritingModal}
+            className="mr-2 p-2 rounded-lg hover:bg-[rgba(120,180,140,0.1)] transition-colors duration-200 flex items-center text-primary-green"
+            title="AI写作助手"
+          >
+            <span className="material-icons">auto_awesome</span>
+          </button>
+          <button
+            onClick={toggleA4Width}
+            className="p-2 rounded-lg hover:bg-[rgba(120,180,140,0.1)] transition-colors duration-200 flex items-center text-primary-green"
+            title={isA4Width ? "切换到全宽模式" : "切换到A4宽度模式"}
+          >
+            <span className="material-icons">{isA4Width ? "fullscreen" : "fit_screen"}</span>
+          </button>
+        </div>
       </div>
       
       {/* 文本编辑区域 */}
@@ -202,6 +358,199 @@ const RichTextEditor = ({
           )}
         </div>
       </div>
+      
+      {/* AI写作弹窗 */}
+      {showAIWritingModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto animate-fadeIn" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="flex items-center justify-center min-h-screen p-4 text-center sm:p-0">
+            {/* 背景遮罩 */}
+            <div className="fixed inset-0 bg-black bg-opacity-30 transition-opacity" aria-hidden="true" onClick={closeAIWritingModal}></div>
+            
+            {/* 弹窗内容 */}
+            <div className="relative inline-block bg-card-color rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle max-w-2xl w-full">
+              <div className="grid-background absolute inset-0 opacity-30"></div>
+              
+              {/* 胶带装饰 */}
+              <div className="tape" style={{ backgroundColor: 'rgba(90,157,107,0.7)', width: '120px', height: '40px', top: '-20px', left: '50%', transform: 'translateX(-50%) rotate(-2deg)' }}>
+                <div className="tape-texture"></div>
+              </div>
+              
+              {/* 弹窗标题 */}
+              <div className="px-6 pt-8 pb-4 flex items-center justify-between border-b border-[rgba(120,180,140,0.2)]">
+                <h3 className="text-xl font-medium text-text-dark" style={{fontFamily: "'Ma Shan Zheng', cursive"}}>
+                  AI写作助手
+                </h3>
+                <button
+                  className="p-2 rounded-full hover:bg-[rgba(120,180,140,0.1)]"
+                  onClick={closeAIWritingModal}
+                >
+                  <span className="material-icons text-text-medium">close</span>
+                </button>
+              </div>
+              
+              {/* 弹窗内容 */}
+              <div className="px-6 py-4">
+                {/* 模型选择 */}
+                <div className="mb-4">
+                  <label className="block text-text-dark font-medium mb-2">选择模型</label>
+                  <select
+                    value={selectedModel}
+                    onChange={handleModelChange}
+                    className="w-full px-4 py-2 bg-white bg-opacity-70 border border-[rgba(120,180,140,0.3)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[rgba(120,180,140,0.5)] text-text-dark"
+                  >
+                    {availableModels.map(model => (
+                      <option key={model.id} value={model.id}>{model.name}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                {/* 提示词选择 */}
+                <div className="mb-4">
+                  <label className="block text-text-dark font-medium mb-2">选择提示词模板</label>
+                  <select
+                    value={selectedPrompt || '-1'}
+                    onChange={handlePromptChange}
+                    className="w-full px-4 py-2 bg-white bg-opacity-70 border border-[rgba(120,180,140,0.3)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[rgba(120,180,140,0.5)] text-text-dark"
+                  >
+                    <option value="-1">不使用模板</option>
+                    {prompts.map(prompt => (
+                      <option key={prompt.id} value={prompt.id}>{prompt.title}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="mb-6">
+                  <label className="block text-text-dark font-medium mb-2">写作提示</label>
+                  <textarea
+                    value={aiPrompt}
+                    onChange={handleAIPromptChange}
+                    className="w-full px-4 py-3 bg-white bg-opacity-70 border border-[rgba(120,180,140,0.3)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[rgba(120,180,140,0.5)] text-text-dark min-h-[160px]"
+                    placeholder="例如：描写一个宁静的森林早晨，充满了生机和神秘感..."
+                  ></textarea>
+                </div>
+                
+                {generateError && (
+                  <div className="mb-4 p-3 bg-[rgba(224,111,111,0.1)] rounded-lg">
+                    <p className="text-[#E06F6F] text-sm">{generateError}</p>
+                  </div>
+                )}
+                
+                <div className="flex items-center justify-between text-text-light text-sm mb-4">
+                  <div className="flex items-center">
+                    <span className="material-icons text-xs mr-1">info</span>
+                    <span>尝试详细描述你想要的场景、角色或情节</span>
+                  </div>
+                </div>
+                
+                <div className="flex space-x-4 justify-end mt-4">
+                  <button
+                    className="btn-outline"
+                    onClick={closeAIWritingModal}
+                  >
+                    取消
+                  </button>
+                  <button
+                    className="btn-primary"
+                    onClick={handleAIGenerate}
+                    disabled={isGenerating}
+                  >
+                    {isGenerating ? (
+                      <>
+                        <span className="material-icons animate-spin mr-2">refresh</span>
+                        生成中...
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-icons mr-2">auto_awesome</span>
+                        生成内容
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+              
+              {/* 翻页装饰 */}
+              <div className="page-curl"></div>
+              
+              {/* 装饰元素 */}
+              <div className="dot hidden md:block" style={{ bottom: "15px", right: "40%" }}></div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* AI生成结果弹窗 */}
+      {showResultModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto animate-fadeIn" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="flex items-center justify-center min-h-screen p-4 text-center sm:p-0">
+            {/* 背景遮罩 */}
+            <div className="fixed inset-0 bg-black bg-opacity-30 transition-opacity" aria-hidden="true" onClick={closeResultModal}></div>
+            
+            {/* 弹窗内容 */}
+            <div className="relative inline-block bg-card-color rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle max-w-2xl w-full">
+              <div className="grid-background absolute inset-0 opacity-30"></div>
+              
+              {/* 胶带装饰 */}
+              <div className="tape" style={{ backgroundColor: 'rgba(224,149,117,0.7)', width: '120px', height: '40px', top: '-20px', left: '50%', transform: 'translateX(-50%) rotate(-2deg)' }}>
+                <div className="tape-texture"></div>
+              </div>
+              
+              {/* 弹窗标题 */}
+              <div className="px-6 pt-8 pb-4 flex items-center justify-between border-b border-[rgba(120,180,140,0.2)]">
+                <h3 className="text-xl font-medium text-text-dark" style={{fontFamily: "'Ma Shan Zheng', cursive"}}>
+                  AI创作结果
+                </h3>
+                <button
+                  className="p-2 rounded-full hover:bg-[rgba(120,180,140,0.1)]"
+                  onClick={closeResultModal}
+                >
+                  <span className="material-icons text-text-medium">close</span>
+                </button>
+              </div>
+              
+              {/* 弹窗内容 */}
+              <div className="px-6 py-4">
+                <div className="mb-6 max-h-[400px] overflow-y-auto" ref={resultContainerRef}>
+                  <div className="p-5 bg-white bg-opacity-50 rounded-xl border border-[rgba(120,180,140,0.2)]">
+                    {isStreaming ? (
+                      <p className="whitespace-pre-wrap text-text-medium">
+                        {generatedContent}
+                        <span className="inline-block ml-1 animate-pulse">▌</span>
+                      </p>
+                    ) : (
+                      <p className="whitespace-pre-wrap text-text-medium">{generatedContent}</p>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex space-x-4 justify-end mt-4">
+                  <button
+                    className="btn-outline"
+                    onClick={closeResultModal}
+                    disabled={isStreaming}
+                  >
+                    取消
+                  </button>
+                  <button
+                    className="btn-primary"
+                    onClick={applyGeneratedContent}
+                    disabled={isStreaming || !generatedContent}
+                  >
+                    <span className="material-icons mr-2">add</span>
+                    应用到文章
+                  </button>
+                </div>
+              </div>
+              
+              {/* 翻页装饰 */}
+              <div className="page-curl"></div>
+              
+              {/* 装饰元素 */}
+              <div className="dot hidden md:block" style={{ bottom: "15px", right: "40%" }}></div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -13,7 +13,9 @@ const API_KEY = DB_CONFIG.KEYS.API_KEY;
  * @returns API密钥或null
  */
 export const getApiKey = async (): Promise<string | null> => {
-  return dbOperations.getSetting<string>(API_KEY);
+  const storedKey = await dbOperations.getSetting<string>(API_KEY);
+  // 如果没有存储的 key，则返回默认 key
+  return storedKey !== null ? storedKey : 'AIzaSyDP5r0WG7dabLH_RnY3jw3cwOHP6SvMBc4';
 };
 
 /**

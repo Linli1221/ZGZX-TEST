@@ -6,8 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "deploy": "wrangler pages deploy .next --project-name=zgzx-tst"
+    "lint": "next lint"
   },
   "dependencies": {
     "@fontsource/comfortaa": "^5.2.5",
@@ -19,16 +18,19 @@
     "@tiptap/pm": "^2.11.7",
     "@tiptap/react": "^2.11.7",
     "@tiptap/starter-kit": "^2.11.7",
+    "@types/uuid": "^10.0.0",
+    "ai": "^4.3.9",
     "encoding-japanese": "^2.2.0",
     "framer-motion": "^12.6.5",
     "idb": "^8.0.2",
     "jschardet": "^3.1.4",
     "next": "14.2.5",
-    "openai": "^4.85.4",
+    "openai": "^4.93.0",
     "react": "^18",
     "react-dom": "^18",
     "react-markdown": "^10.1.0",
     "text-encoding": "^0.7.0",
+    "uuid": "^11.1.0",
     "zustand": "^5.0.3"
   },
   "devDependencies": {
